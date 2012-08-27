@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   applicationComplete="windowedapplication_applicationCompleteHandler(event)" 
+					   showStatusBar="false" xmlns:view="view.*" xmlns:control="control.*"
+					   >
+	<fx:Metadata>
+		[ResourceBundle("resources")]
+	</fx:Metadata>
+	<fx:Style source="styles/estilos.css"/>
+	<fx:Script>
+		<![CDATA[
+			import air.net.SocketMonitor;
+			import air.net.URLMonitor;
+			import air.update.ApplicationUpdaterUI;
+			
+			import control.LineWithArrow;
+			import control.SimpleEncryptionKeyGenerator;
+			
+			import flash.events.StatusEvent;
+			import flash.net.Socket;
+			import flash.net.URLRequest;
+			
+			import model.vo.device_vo;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.FlexNativeMenuEvent;
+			import mx.graphics.SolidColorStroke;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			
+			import spark.components.supportClasses.Range;
+			
+			import view.Config;
+			import view.Device;
+			import view.Sobre;
+			import view.events.DeviceEvent;
+			
+			private var check_url:URLMonitor;
+			private var check_socket:SocketMonitor;
+			private var conn:Socket;
+			
+			private var app:XML;
+			private var versionLabel:String = "";
+			private var about:Sobre;
+			private var appUpdater:ApplicationUpdaterUI = new ApplicationUpdaterUI(); 
+			private var updateTimer:Timer;
+			
+			[Bindable]
+			private var database:File;
+			[Bindable]
+			private var connection:SQLConnection;
+			[Bindable]
+			private var stat:SQLStatement;
+			[Bindable]
+			public var timeResponse:int;
+			[Bindable]
+			private var devices:ArrayCollection = new ArrayCollection;
+			
+			protected function windowedapplication_applicationCompleteHandler(event:FlexEvent):void
+			{
+				tracker.trackPageview("/NetMapAir");
+				this.maximize();
+				app = this.nativeApplication.applicationDescriptor;
+				var ns:Namespace = app.namespace();
+				versionLabel = app.ns::versionLabel;
+				this.title = "NetMapAir "+versionLabel;
+				database = File.applicationStorageDirectory.resolvePath("NetMapAir.db");
+				connection = new SQLConnection();
+				connection.addEventListener(SQLEvent.OPEN, sql_openHandler);
+				var pass:SimpleEncryptionKeyGenerator = new SimpleEncryptionKeyGenerator();
+				connection.openAsync(database, SQLMode.CREATE, null, false, 1024, pass.getEncryptionKey("xTc5%f!1.'Q")); 
+				appUpdater.configurationFile = new File("app:/updateConfig.xml"); 
+				appUpdater.initialize();
+				updateTimer = new Timer(20000, 1);
+				updateTimer.addEventListener(TimerEvent.TIMER_COMPLETE, updateTimer_completeHandler);
+				updateTimer.start();
+			}
+			protected function updateTimer_completeHandler(event:TimerEvent):void
+			{
+				appUpdater.isCheckForUpdateVisible = false;
+				appUpdater.checkNow();
+			}
+			protected function sql_openHandler(event:SQLEvent):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "CREATE TABLE IF NOT EXISTS Devices (DEVnId INTEGER PRIMARY KEY AUTOINCREMENT, DEVsHost TEXT, DEVsPort TEXT, DEVsPosX TEXT, DEVsPosY TEXT);";
+				stat.execute(-1, new Responder(sql_openSucessHandler, sql_errorHandler));
+			}
+			protected function sql_openSucessHandler(event:SQLResult):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "CREATE TABLE IF NOT EXISTS Config (CFGnId INTEGER PRIMARY KEY AUTOINCREMENT, CFGnTime INTEGER);";
+				stat.execute(-1, new Responder(sql_configHandler, sql_errorHandler));
+			}
+			protected function sql_configHandler(event:SQLResult):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "SELECT * FROM Config;";
+				stat.execute(-1, new Responder(sql_configSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_configSuccessHandler(event:SQLResult):void
+			{
+				var data:ArrayCollection = new ArrayCollection(event.data);
+				if(data.length > 0 )
+					timeResponse = data.getItemAt(0).CFGnTime;
+				else
+					timeResponse = 10;
+				sql_selectHandler();
+			}
+			protected function sql_selectHandler():void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "SELECT * FROM Devices";
+				stat.execute(-1, new Responder(sql_selectSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_selectSuccessHandler(event:SQLResult):void
+			{
+				devices = new ArrayCollection(event.data);
+				for(var i:int=0; i<devices.length; i++)
+					insertDevice(devices.getItemAt(i).DEVnId, devices.getItemAt(i).DEVsHost, devices.getItemAt(i).DEVsPort, devices.getItemAt(i).DEVsPosX, devices.getItemAt(i).DEVsPosY);
+			}
+			protected function menuBar_itemClickHandler(event:FlexNativeMenuEvent):void
+			{
+				var menu:XMLListCollection = menuBar.dataProvider as XMLListCollection;
+				if(event.item.@data == "exit")
+				{
+					this.exit();
+				} else if(event.item.@data == "config")
+				{
+					var config:Config = new Config();
+					config.conn = connection;
+					PopUpManager.addPopUp(config, this, true);
+					PopUpManager.centerPopUp(config);
+				} else if(event.item.@data == "content_help")
+				{
+					Alert.show(resourceManager.getString('resources', 'message.help'), resourceManager.getString('resources', 'message.help.title'));
+				} else if(event.item.@data == "lang")
+				{
+					var selectedLocale:String = event.item.@value;
+					if (selectedLocale == "2") {
+						resourceManager.localeChain = ["pt_BR"];
+					} else if (selectedLocale == "3") {
+						resourceManager.localeChain = ["es_ES"];
+					} else {
+						resourceManager.localeChain = ["en_US"];
+					}
+				} else if(event.item.@data == "update")
+				{
+					appUpdater.isCheckForUpdateVisible = true;
+					appUpdater.checkNow();
+				} else if(event.item.@data == "about")
+				{
+					about = new Sobre();
+					about.versao = versionLabel;
+					PopUpManager.addPopUp(about, this, true);
+					PopUpManager.centerPopUp(about);
+				}
+			}
+			protected function insert_clickHandler(event:MouseEvent):void
+			{
+				if(hostTextInput.text.indexOf('http://') == -1 && portTextInput.text == "")
+					Alert.show(resourceManager.getString('resources', 'message.error.port'), resourceManager.getString('resources', 'message.error.title'));
+				else
+				{
+					tracker.trackEvent("NetMapAir", "device", "Insert Device", 1);
+					sql_insertHandler(hostTextInput.text, portTextInput.text);
+				}
+			}
+			protected function sql_insertHandler(host:String, port:String):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "INSERT INTO Devices ('DEVsHost','DEVsPort') VALUES ('"+host+"','"+port+"')";
+				stat.execute(-1, new Responder(sql_insertSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_insertSuccessHandler(event:SQLResult):void
+			{
+				insertDevice(event.lastInsertRowID, hostTextInput.text, portTextInput.text, Math.random()*1000, Math.random()*700);
+				var dev:Object = new Object;
+				dev.DEVnId = event.lastInsertRowID;
+				dev.DEVsHost = hostTextInput.text;
+				dev.DEVsPort = portTextInput.text;
+				devices.addItem(dev);
+			}
+			protected function insertDevice(id:int, host:String, port:String, x:int, y:int):void
+			{
+				var device:Device = new Device();
+				device.sql = connection;
+				device.dev.DEVnId = id;
+				device.dev.DEVsHost = host;
+				device.dev.DEVsPort = port;
+				device.pingTimer.start();
+				device.x = x;
+				device.y = y;
+				device.pingTimer.delay = timeResponse*1000;
+				device.addEventListener("removeDevice", removeDevice_Handler); 
+				PopUpManager.addPopUp(device, vboxDevices);
+			}
+			protected function removeDevice_Handler(event:DeviceEvent):void
+			{
+				var dev:Device = event.currentTarget as Device;
+				sql_removeHandler(dev.dev.DEVnId);
+				PopUpManager.removePopUp(dev);
+			}
+			protected function sql_removeHandler(id:int):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "DELETE FROM Devices WHERE DEVnId = '"+id+"'";
+				stat.execute(-1, new Responder(sql_removeSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_removeSuccessHandler(event:SQLResult):void
+			{
+				//Alert.show(ObjectUtil.toString(event));
+			}
+			protected function sql_errorHandler(event:SQLError):void
+			{
+				Alert.show(resourceManager.getString('resources', 'message.error.sql')+"("+event.message+"-"+event.details+")",resourceManager.getString('resources', 'message.error.title'));
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<fx:XMLList id="menuList">
+			<menuitem label="{resourceManager.getString('resources', 'menu.file')}">
+				<menuitem label="{resourceManager.getString('resources', 'menu.file.exit')}" data="exit" keyEquivalent="x" controlKey="true"/>
+			</menuitem>
+			<menuitem label="{resourceManager.getString('resources', 'menu.tools')}">
+				<menuitem label="{resourceManager.getString('resources', 'menu.tools.config')}" data="config" keyEquivalent="f" controlKey="true"/>
+				<menuitem label="{resourceManager.getString('resources', 'menu.tools.lang')}">
+					<menuitem label="{resourceManager.getString('resources', 'menu.tools.lang.en')}" value="1" data="lang"/>
+					<menuitem label="{resourceManager.getString('resources', 'menu.tools.lang.pt')}" value="2" data="lang"/>
+					<menuitem label="{resourceManager.getString('resources', 'menu.tools.lang.es')}" value="3" data="lang"/>
+				</menuitem>
+			</menuitem>
+			<menuitem label="{resourceManager.getString('resources', 'menu.help')}">
+				<menuitem label="{resourceManager.getString('resources', 'menu.help.content')}" data="content_help"/>
+				<menuitem label="{resourceManager.getString('resources', 'menu.help.update')}" data="update"  keyEquivalent="u" controlKey="true"/>
+				<menuitem type="separator" />
+				<menuitem label="{resourceManager.getString('resources', 'menu.help.about')}" data="about" keyEquivalent="a" controlKey="true"/>
+			</menuitem>
+		</fx:XMLList>
+		<analytics:FlexTracker
+			xmlns:analytics="com.google.analytics.components.*"
+			id="tracker"
+			account="UA-2203828-1"
+			mode="AS3"
+			visualDebug="false"
+			/>
+	</fx:Declarations>
+	<s:menu>
+		<mx:FlexNativeMenu id="menuBar" 
+						   labelField="@label" keyEquivalentField="@keyEquivalent"
+						   itemClick="menuBar_itemClickHandler(event)"
+						   dataProvider="{menuList}"
+						   />
+		
+	</s:menu>
+	<mx:VBox width="100%" height="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10">
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="{resourceManager.getString('resources', 'label.host')}:"/>
+			<s:TextInput id="hostTextInput" widthInChars="40" text="http://www.google.com"/>
+			<s:Label text="{resourceManager.getString('resources', 'label.port')}:" visible="{hostTextInput.text.indexOf('http://') == -1}" includeInLayout="{hostTextInput.text.indexOf('http://') == -1}"/>
+			<s:TextInput id="portTextInput" widthInChars="5" textAlign="center" visible="{hostTextInput.text.indexOf('http://') == -1}" includeInLayout="{hostTextInput.text.indexOf('http://') == -1}"/>
+			<s:Button id="insert" click="insert_clickHandler(event)" label="{resourceManager.getString('resources', 'button.insert')}"/>	
+		</mx:HBox>
+		
+		<s:VGroup id="vboxDevices" x="0" y="0" width="100%" height="100%" horizontalAlign="center" verticalAlign="middle"/>
+	</mx:VBox>
+</s:WindowedApplication>

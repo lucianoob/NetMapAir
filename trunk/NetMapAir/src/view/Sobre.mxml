@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				width="600" height="150"
+				title="{resourceManager.getString('resources', 'menu.help.about')}"
+				creationComplete="titlewindow1_creationCompleteHandler(event)"
+				close="ttlWndw_close(event)"
+				>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import scripts.functions;
+			
+			import spark.components.Application;
+			
+			[Bindable]
+			public var versao:String = ""; 
+			
+			protected function ttlWndw_close(evt:CloseEvent):void 
+			{
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+			}
+			protected function titlewindow1_creationCompleteHandler(event:FlexEvent):void
+			{ 
+				var swf:view.SWF = new SWF(); 
+				swf.SWFByteCodeReader(this.loaderInfo);
+				var d:Date = swf.readCompilationDate();
+				empresaText.htmlText +="NetMapAir "+versao+"<br>";
+				empresaText.htmlText +=resourceManager.getString('resources', 'about.desc')+"<br>";
+				empresaText.htmlText +=resourceManager.getString('resources', 'about.create')+functions.dateFlexToStringTime(d)+"<br>";
+				empresaText.htmlText +=resourceManager.getString('resources', 'about.dev')+" Luciano Oliveira Borges (<font color='#0000ff'><a href='mailto:luciano@iautomate.com.br'>luciano@iautomate.com.br</a></font>).<br>";
+				empresaText.htmlText +=resourceManager.getString('resources', 'about.owner')+" IAutomate - Integração de Sistemas (<font color='#0000ff'><a href='http://www.iautomate.com.br'>www.iautomate.com.br</a></font>).<br>";
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<mx:VBox width="100%" height="100%" horizontalAlign="center"
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:TextArea id="empresaText" styleName="empresaStyle" 
+					 fontSize="16"
+					 fontWeight="bold"
+					 width="100%"  
+					 height="100%"
+					 editable="false"
+					 selectable="false"
+					 textAlign="center"
+					 verticalScrollPolicy="off"
+					 horizontalScrollPolicy="off"
+					 borderVisible="false"
+					 />
+	</mx:VBox>	
+</s:TitleWindow>

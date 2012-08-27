@@ -1,0 +1,62 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace flexlib "http://code.google.com/p/flexlib/";
+mx|ToolTip
+{
+	backgroundColor: #000000;
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+	color: #FFFFFF;
+}
+s|Button
+{
+	backgroundColor: #FFFFFF;
+	chromeColor: #CDCDCD;
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+}
+mx|Alert
+{
+	backgroundColor: #FFFFFF;
+	chromeColor: #CDCDCD;
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+	font-style: italic;
+}
+s|Label
+{
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+	focus-color: #000000;
+}
+s|TextInput
+{
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+}
+s|TextArea
+{
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+}
+mx|ComboBox
+{
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+	focus-color: #000000;
+}
+s|TitleWindow
+{
+	font-family: Verdana;
+	fontSize: 14;
+	fontWeight: bold;
+	focus-color: #000000;
+}	

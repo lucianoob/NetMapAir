@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			width="400" height="200"
+			title="{resourceManager.getString('resources', 'config.title')}"
+			close="titlewindow_closeHandler(event)"
+			creationComplete="titlewindow_creationCompleteHandler(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var conn:SQLConnection;
+			[Bindable]
+			private var stat:SQLStatement;
+
+			protected function titlewindow_closeHandler(event:CloseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			protected function titlewindow_creationCompleteHandler(event:FlexEvent):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = conn;
+				stat.text = "SELECT * FROM Config;";
+				stat.execute(-1, new Responder(sql_selectSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_selectSuccessHandler(event:SQLResult):void
+			{
+				var data:ArrayCollection = new ArrayCollection(event.data);
+				if(data.length > 0 )
+					textInputTime.text = data.getItemAt(0).CFGnTime;
+				else
+				{
+					stat = new SQLStatement();
+					stat.sqlConnection = conn;
+					stat.text = "INSERT INTO Config (CFGnTime) VALUES ('10')";
+					stat.execute(-1, new Responder(null, sql_errorHandler));
+					textInputTime.text = "10";
+				}
+			}
+			protected function buttonSave_clickHandler(event:MouseEvent):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = conn;
+				stat.text = "UPDATE Config SET CFGnTime = '"+textInputTime.text+"'";
+				stat.execute(-1, new Responder(sql_setConfigSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_setConfigSuccessHandler(event:SQLResult):void
+			{
+				FlexGlobals.topLevelApplication.timeResponse = textInputTime.text;
+				Alert.show(resourceManager.getString('resources', 'config.message.save'));
+				PopUpManager.removePopUp(this);
+			}
+			protected function sql_errorHandler(event:SQLError):void
+			{
+				Alert.show(resourceManager.getString('resources', 'message.error.sql')+"("+event.details+")",resourceManager.getString('resources', 'message.error.title'));
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<s:Form>
+			<s:FormItem label="{resourceManager.getString('resources', 'config.time')} (s):" toolTip="{resourceManager.getString('resources', 'config.time.tooltip')}">
+				<s:TextInput id="textInputTime" widthInChars="5" restrict="0-9" textAlign="center"/>
+			</s:FormItem>
+		</s:Form>	
+		<mx:HBox width="100%" horizontalAlign="center">
+			<s:Button id="buttonSave" label="{resourceManager.getString('resources', 'config.button.save')}" click="buttonSave_clickHandler(event)"/>	
+		</mx:HBox>
+	</mx:VBox>
+</s:TitleWindow>
