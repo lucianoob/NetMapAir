@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="200" height="150"
+		 creationComplete="device_creationCompleteHandler(event)"
+		 close="device_closeHandler(event)"
+		 move="titlewindow_moveHandler(event)"
+		 >
+	<fx:Metadata>
+		[Event(name="removeDevice", type="flash.events.Event")]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import air.net.SocketMonitor;
+			import air.net.URLMonitor;
+			
+			import control.ICODecoder;
+			import control.ICOImageData;
+			
+			import flash.net.navigateToURL;
+			
+			import model.vo.device_vo;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.MoveEvent;
+			import mx.graphics.SolidColorStroke;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			
+			import scripts.functions;
+			
+			import view.events.DeviceEvent;
+			
+			private var check_url:URLMonitor;
+			private var check_socket:SocketMonitor;
+			private var conn:Socket;
+			
+			[Embed(source="assets/ok-icon.png")] 
+			private var iconOk:Class; 
+			[Embed(source="assets/question-icon.png")] 
+			private var iconQuestion:Class; 
+			[Embed(source="assets/error-icon.png")] 
+			private var iconErro:Class; 
+			[Embed(source="assets/pc-icon.png")] 
+			private var iconPc:Class; 
+			[Embed(source="assets/web-icon.png")] 
+			private var iconWeb:Class; 
+			[Bindable]
+			public var favicon:Object; 
+			
+			private var removeDevice:DeviceEvent = new DeviceEvent('removeDevice');
+			
+			[Bindable]
+			public var dev:device_vo = new device_vo();
+			[Bindable]
+			private var cont:int = 0;
+			[Bindable]
+			private var image:Object;
+			[Bindable]
+			private var pathFavicon:String = "/favicon.ico";
+			[Bindable]
+			private var status:Object;
+			[Bindable]
+			public var portName:String = "";
+			[Bindable]
+			public var message:String = "";
+			[Bindable]
+			public var last:Date;
+			[Bindable]
+			public var ping_init:Date;
+			[Bindable]
+			public var ping_end:Date;
+			[Bindable]
+			public var lasts:String = "";
+			[Bindable]
+			public var lasts10:String = "";
+
+			[Bindable]
+			public var pingTimer:Timer = new Timer(1000, 0);
+			
+			[Bindable]
+			public var sql:SQLConnection;
+			
+			protected function device_creationCompleteHandler(event:FlexEvent):void
+			{
+				if(dev.DEVsPort == "")
+					image = iconWeb;
+				else 
+					image = iconPc;
+				pingTimer.addEventListener(TimerEvent.TIMER, start_pingHandler);
+				last = new Date();
+				status = iconQuestion;
+			}
+			protected function device_closeHandler(event:CloseEvent):void
+			{
+				pingTimer.stop();
+				dispatchEvent(removeDevice);
+			}
+			protected function start_pingHandler(event:TimerEvent):void
+			{
+				pingTimer.delay = FlexGlobals.topLevelApplication.timeResponse*1000;
+				ping_init = new Date();
+				if(dev.DEVsHost.indexOf("http://") != -1)
+				{
+					loadICOFile(dev.DEVsHost+pathFavicon);
+					check_url = new URLMonitor(new URLRequest(dev.DEVsHost));
+					check_url.addEventListener(StatusEvent.STATUS, check_url_statusHandler);
+					check_url.start();
+				} else 
+				{
+					iconPort(dev.DEVsPort);
+					conn = new Socket();
+					check_socket = new SocketMonitor(dev.DEVsHost, Number(dev.DEVsPort));
+					conn.addEventListener(Event.CONNECT, conn_connectHandler);
+					check_socket.addEventListener(StatusEvent.STATUS, check_socket_statusHandler);
+					check_socket.start();
+				}
+			}	
+			protected function loadICOFile( url:String ):void 
+			{
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.BINARY;
+				loader.addEventListener( Event.COMPLETE, onCompleteLoad );
+				loader.addEventListener(IOErrorEvent.IO_ERROR, onIoErroLoad);
+				loader.load(new URLRequest(url));
+			}
+			protected function onIoErroLoad( e:Event ):void 
+			{
+				if(pathFavicon == "/favicon.ico")
+				{
+					pathFavicon = "/images/favicon.ico";
+					loadICOFile(dev.DEVsHost+pathFavicon);
+				} else if(pathFavicon == "/images/favicon.ico")
+				{
+					pathFavicon = "/imagens/favicon.ico";
+					loadICOFile(dev.DEVsHost+pathFavicon);
+				} else if(pathFavicon == "/imagens/favicon.ico")
+				{
+					pathFavicon = "/assets/favicon.ico";
+					loadICOFile(dev.DEVsHost+pathFavicon);
+				} else
+				{
+					favicon = 'assets/icon_16.png';
+				}
+			}
+			protected function onCompleteLoad( e:Event ):void 
+			{
+				var loader:URLLoader = e.target as URLLoader;
+				var decoder:ICODecoder = new ICODecoder();
+				var arr:Array= decoder.decode( loader.data );
+				
+				for ( var i:int = 0; i < arr.length; i++ ) {
+					var data:ICOImageData = arr[i] as ICOImageData;
+					if ( ( data.info.width == 16 ) && ( data.info.height == 16 ) ) {
+						// if 16×16 bit
+						favicon = new Bitmap( data.image );
+					}
+				}
+			}
+			protected function iconPort( porta:String ):void 
+			{
+				if(porta == "80" || porta == "8080")
+				{
+					favicon = 'assets/http.png';
+					portName = "HTTP";
+				} else if(porta == "20" || porta == "21")
+				{
+					favicon = 'assets/ftp.png';
+					portName = "FTP";
+				} else if(porta == "110")
+				{
+					favicon = 'assets/pop3.png';
+					portName = "POP3";
+				} else if(porta == "25")
+				{
+					favicon = 'assets/smtp.png';
+					portName = "SMTP";
+				} else if(porta == "443")
+				{
+					favicon = 'assets/https.png';
+					portName = "HTTPS";
+				} else if(porta == "3306")
+				{
+					favicon = 'assets/mysql.png';
+					portName = "MySQL";
+				} else
+				{
+					favicon = 'assets/icon_16.png';
+					portName = "";
+				}
+			}
+			private function conn_connectHandler(event:Event):void
+			{
+				
+				//Alert.show(resourceManager.getString('resources', 'message.ok1')+"'"+port+"' "+resourceManager.getString('resources', 'message.ok2'), resourceManager.getString('resources', 'message.ok.title'));
+			}
+			protected function check_url_statusHandler(event:StatusEvent):void
+			{
+				ping_end = new Date();
+				last = new Date();
+				lasts10 += "\n"+resourceManager.getString('resources', 'message.last.execution')+" ("+cont.toString()+")";
+				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.date')+": "+functions.dateFlexToStringTime(last);
+				if(check_url.available)
+				{
+					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = ok";
+					status = iconOk;
+				} else
+				{
+					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = erro";
+					status = iconErro;
+				}
+				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.time')+": "+differenceBetweenDates(ping_init,ping_end).toString()+"ms";
+				cont++;
+				if((Math.round(cont/10)-(cont/10)) == 0)
+				{
+					lasts += lasts10;
+					lasts10 = "";
+				}
+				message = ObjectUtil.toString(event);
+			}
+			private function differenceBetweenDates(date1:Date, date2:Date):Number{
+				var MS_PER_DAY:uint = 1000 * 60 * 60 * 24;
+				var tempDate:Date = new Date(date2.time - date1.time);
+				var difference:Number = 
+					Math.abs(Math.round((tempDate.time / MS_PER_DAY)));
+				return tempDate.time;
+			}
+			protected function check_socket_statusHandler(event:StatusEvent):void
+			{
+				ping_end = new Date();
+				last = new Date();
+				lasts10 += "\n"+resourceManager.getString('resources', 'message.last.execution')+" ("+cont.toString()+")";
+				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.date')+": "+functions.dateFlexToStringTime(last);
+				if (check_socket.available)
+				{
+					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = ok";
+					status = iconOk;
+					conn.connect(dev.DEVsHost, Number(dev.DEVsPort));
+				} else 
+				{
+					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = erro";
+					status = iconErro;
+					//Alert.show(resourceManager.getString('resources', 'message.error1')+"'"+port+"' "+resourceManager.getString('resources', 'message.error2'), resourceManager.getString('resources', 'message.error.title'));
+				}
+				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.time')+": "+differenceBetweenDates(ping_init,ping_end).toString()+"ms";
+				cont++;
+				if((Math.round(cont/10)-(cont/10)) == 0)
+				{
+					lasts += lasts10;
+					lasts10 = "";
+				}
+				message = ObjectUtil.toString(event);
+			}
+			
+			protected function labelHistory_clickHandler(event:MouseEvent):void
+			{
+				var msg:Message = new Message();
+				msg.titulo = resourceManager.getString('resources', 'message.last');
+				msg.mensagem = lasts;
+				msg.endereco = dev.DEVsHost+(dev.DEVsPort == "" ? "" : ":"+dev.DEVsPort);
+				PopUpManager.addPopUp(msg, this.parent, true);
+				PopUpManager.centerPopUp(msg);
+			}
+			protected function titlewindow_moveHandler(event:MoveEvent):void
+			{
+				var stat:SQLStatement = new SQLStatement();
+				stat.sqlConnection = sql;
+				stat.text = "UPDATE Devices SET DEVsPosX = '"+this.x+"', DEVsPosY = '"+this.y+"' WHERE DEVnId = '"+dev.DEVnId+"'";
+				stat.execute(-1, new Responder(sql_moveSuccessHandler, sql_errorHandler));
+			}
+			protected function sql_moveSuccessHandler(event:SQLResult):void
+			{
+				//Alert.show(ObjectUtil.toString(event));
+			}
+			protected function sql_errorHandler(event:SQLError):void
+			{
+				Alert.show(resourceManager.getString('resources', 'message.error.sql')+"("+event.message+")",resourceManager.getString('resources', 'message.error.title'));
+			}
+			protected function imageType_clickHandler(event:MouseEvent):void
+			{
+				var url:String = dev.DEVsHost + ( dev.DEVsPort != '' ? ':'+dev.DEVsPort : '');
+				if(url.indexOf("http://") == -1)
+					url = "http://"+url;
+				navigateToURL(new URLRequest(url));
+			}
+			protected function labelAddress_clickHandler(event:MouseEvent):void
+			{
+				System.setClipboard(dev.DEVsHost + ( dev.DEVsPort != '' ? ':'+dev.DEVsPort : ''));
+				Alert.show(resourceManager.getString('resources', 'message.clipboard.copy'));
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" horizontalAlign="center" verticalAlign="middle" borderVisible="true" borderStyle="outset"
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<s:Image source="{image}" width="100%" height="100%" toolTip="{resourceManager.getString('resources', 'message.browser')}" 
+				 useHandCursor="true" buttonMode="true" click="imageType_clickHandler(event)"/>
+		<mx:HBox width="100%" verticalAlign="middle" horizontalAlign="center">
+			<s:Image source="{favicon}" width="16" height="16" toolTip="{portName}"/>
+			<s:Label text="{((dev.DEVsHost.length > 25) ? dev.DEVsHost.toString().substr(0, 25) + '...' : dev.DEVsHost)  + ( dev.DEVsPort != '' ? ':'+dev.DEVsPort : '')}" fontSize="8" 
+					 fontWeight="bold" textAlign="center" useHandCursor="true" buttonMode="true" click="labelAddress_clickHandler(event)"
+					 toolTip="{resourceManager.getString('resources', 'message.clipboard')+(dev.DEVsHost.length > 25 ? '\n'+dev.DEVsHost : '')}"/>
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="{functions.dateFlexToStringTime(last)+' ('+cont+')'}"  useHandCursor="true" buttonMode="true"
+					 fontSize="8" fontWeight="bold" toolTip="{resourceManager.getString('resources', 'message.history')+lasts10}" click="labelHistory_clickHandler(event)"/>
+			<s:Image source="{status}" width="16" height="16" toolTip="{message}" useHandCursor="true" buttonMode="true"/>
+		</mx:HBox>
+	</mx:VBox>
+</s:TitleWindow>

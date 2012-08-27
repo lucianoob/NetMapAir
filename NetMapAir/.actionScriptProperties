@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<actionScriptProperties analytics="false" mainApplicationPath="NetMapAir.mxml" projectUUID="8c90b1ca-4b7b-476e-8800-5ddc2438f836" version="10">
+  <compiler additionalCompilerArguments="-locale=en_US,es_ES,pt_BR -source-path=./locale/{locale} -allow-source-path-overlap=true" autoRSLOrdering="true" copyDependentFiles="true" flexSDK="Flex 4.5.1A" fteInMXComponents="false" generateAccessible="true" htmlExpressInstall="true" htmlGenerate="false" htmlHistoryManagement="false" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="bin-debug" removeUnusedRSL="true" sourceFolderPath="src" strict="true" targetPlayerVersion="0.0.0" useApolloConfig="true" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
+    <compilerSourcePath>
+      <compilerSourcePathEntry kind="1" linkType="1" path="C:/xampp/htdocs/iautomate/apps/netmapair"/>
+    </compilerSourcePath>
+    <libraryPath defaultLinkType="0">
+      <libraryPathEntry kind="4" path="">
+        <excludedEntries>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/flex.swc" useDefaultLinkType="false"/>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/core.swc" useDefaultLinkType="false"/>
+        </excludedEntries>
+      </libraryPathEntry>
+      <libraryPathEntry kind="1" linkType="1" path="libs"/>
+      <libraryPathEntry kind="3" linkType="1" path="${DOCUMENTS}/IAutomate/bin/IAutomate.swc" useDefaultLinkType="false"/>
+    </libraryPath>
+    <sourceAttachmentPath/>
+  </compiler>
+  <applications>
+    <application path="NetMapAir.mxml">
+      <airExcludes/>
+    </application>
+  </applications>
+  <modules/>
+  <buildCSSFiles/>
+  <flashCatalyst validateFlashCatalystCompatibility="false"/>
+  <buildTargets>
+    <buildTarget buildTargetName="default">
+      <airSettings airCertificatePath="C:/workspaces/Flex/certIAutomate.p12" airTimestamp="false" anePathSet="true" version="1">
+        <airExcludes>
+          <pathEntry path="snap04.png"/>
+          <pathEntry path="snap03.png"/>
+          <pathEntry path="snap02.png"/>
+          <pathEntry path="snap01.png"/>
+          <pathEntry path="index.html"/>
+          <pathEntry path="updateDescriptor.xml"/>
+        </airExcludes>
+        <anePaths/>
+      </airSettings>
+      <actionScriptSettings version="1"/>
+    </buildTarget>
+  </buildTargets>
+</actionScriptProperties>
