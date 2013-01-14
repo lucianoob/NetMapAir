@@ -12,13 +12,13 @@
 	</fx:Metadata>
 	<fx:Script>
 		<![CDATA[
+			import flash.net.navigateToURL;
+			
 			import air.net.SocketMonitor;
 			import air.net.URLMonitor;
 			
 			import control.ICODecoder;
 			import control.ICOImageData;
-			
-			import flash.net.navigateToURL;
 			
 			import model.vo.device_vo;
 			
@@ -26,10 +26,8 @@
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
-			import mx.events.DragEvent;
 			import mx.events.FlexEvent;
 			import mx.events.MoveEvent;
-			import mx.graphics.SolidColorStroke;
 			import mx.managers.PopUpManager;
 			import mx.utils.ObjectUtil;
 			
@@ -56,10 +54,10 @@
 			
 			private var removeDevice:DeviceEvent = new DeviceEvent('removeDevice');
 			
+			private var stat:SQLStatement;
+			
 			[Bindable]
 			public var dev:device_vo = new device_vo();
-			[Bindable]
-			private var cont:int = 0;
 			[Bindable]
 			private var image:Object;
 			[Bindable]
@@ -204,27 +202,31 @@
 			{
 				ping_end = new Date();
 				last = new Date();
-				lasts10 += "\n"+resourceManager.getString('resources', 'message.last.execution')+" ("+cont.toString()+")";
-				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.date')+": "+functions.dateFlexToStringTime(last);
-				if(check_url.available)
+				stat = new SQLStatement();
+				var check:String;
+				stat.sqlConnection = sql;
+				if(check_url != null)
 				{
-					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = ok";
-					status = iconOk;
+					if(check_url.available)
+					{
+						check = "ok";
+						status = iconOk;
+					} else
+					{
+						check = "erro";
+						status = iconErro;
+					}
 				} else
 				{
-					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = erro";
+					check = "erro";
 					status = iconErro;
 				}
-				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.time')+": "+differenceBetweenDates(ping_init,ping_end).toString()+"ms";
-				cont++;
-				if((Math.round(cont/10)-(cont/10)) == 0)
-				{
-					lasts += lasts10;
-					lasts10 = "";
-				}
-				message = ObjectUtil.toString(event);
+				stat.text = "INSERT INTO History ('HISnDevice', 'HISdDate', 'HISsStatus', 'HISnResponseTime') ";
+				stat.text += "VALUES ('"+dev.DEVnId+"','"+functions.dateToDateTimeSQL(last)+"','"+check+"','"+differenceBetweenDates(ping_init,ping_end).toString()+"')";
+				stat.execute(-1, new Responder( null, sql_errorHandler));
 			}
-			private function differenceBetweenDates(date1:Date, date2:Date):Number{
+			private function differenceBetweenDates(date1:Date, date2:Date):Number
+			{
 				var MS_PER_DAY:uint = 1000 * 60 * 60 * 24;
 				var tempDate:Date = new Date(date2.time - date1.time);
 				var difference:Number = 
@@ -235,41 +237,49 @@
 			{
 				ping_end = new Date();
 				last = new Date();
-				lasts10 += "\n"+resourceManager.getString('resources', 'message.last.execution')+" ("+cont.toString()+")";
-				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.date')+": "+functions.dateFlexToStringTime(last);
-				if (check_socket.available)
+				stat = new SQLStatement();
+				var check:String;
+				stat.sqlConnection = sql;
+				if(check_socket != null)
 				{
-					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = ok";
-					status = iconOk;
-					conn.connect(dev.DEVsHost, Number(dev.DEVsPort));
-				} else 
+					if(check_socket.available)
+					{
+						check = "ok";
+						status = iconOk;
+					} else
+					{
+						check = "erro";
+						status = iconErro;
+					}
+				} else
 				{
-					lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.status')+" = erro";
+					check = "erro";
 					status = iconErro;
-					//Alert.show(resourceManager.getString('resources', 'message.error1')+"'"+port+"' "+resourceManager.getString('resources', 'message.error2'), resourceManager.getString('resources', 'message.error.title'));
 				}
-				lasts10 += "\n\t"+resourceManager.getString('resources', 'message.last.time')+": "+differenceBetweenDates(ping_init,ping_end).toString()+"ms";
-				cont++;
-				if((Math.round(cont/10)-(cont/10)) == 0)
-				{
-					lasts += lasts10;
-					lasts10 = "";
-				}
-				message = ObjectUtil.toString(event);
+				stat.text = "INSERT INTO History ('HISnDevice', 'HISdDate', 'HISsStatus', 'HISnResponseTime') ";
+				stat.text += "VALUES ('"+dev.DEVnId+"','"+functions.dateToDateTimeSQL(last)+"','"+check+"','"+differenceBetweenDates(ping_init,ping_end).toString()+"')";
+				stat.execute(-1, new Responder( null, sql_errorHandler));
 			}
 			
 			protected function labelHistory_clickHandler(event:MouseEvent):void
 			{
+				stat = new SQLStatement();
+				stat.sqlConnection = sql;
+				stat.text = "SELECT HISnId, HISdDate, HISsStatus, HISnResponseTime FROM History WHERE HISnDevice = '"+dev.DEVnId+"' ORDER BY HISnId DESC";
+				stat.execute(-1, new Responder(getHistory_sqlHandler, sql_errorHandler));
+			}
+			protected function getHistory_sqlHandler(event:SQLResult):void
+			{
 				var msg:Message = new Message();
+				msg.history = new ArrayCollection(event.data);
 				msg.titulo = resourceManager.getString('resources', 'message.last');
-				msg.mensagem = lasts;
 				msg.endereco = dev.DEVsHost+(dev.DEVsPort == "" ? "" : ":"+dev.DEVsPort);
 				PopUpManager.addPopUp(msg, this.parent, true);
 				PopUpManager.centerPopUp(msg);
 			}
 			protected function titlewindow_moveHandler(event:MoveEvent):void
 			{
-				var stat:SQLStatement = new SQLStatement();
+				stat = new SQLStatement();
 				stat.sqlConnection = sql;
 				stat.text = "UPDATE Devices SET DEVsPosX = '"+this.x+"', DEVsPosY = '"+this.y+"' WHERE DEVnId = '"+dev.DEVnId+"'";
 				stat.execute(-1, new Responder(sql_moveSuccessHandler, sql_errorHandler));
@@ -307,7 +317,7 @@
 					 toolTip="{resourceManager.getString('resources', 'message.clipboard')+(dev.DEVsHost.length > 25 ? '\n'+dev.DEVsHost : '')}"/>
 		</mx:HBox>
 		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
-			<s:Label text="{functions.dateFlexToStringTime(last)+' ('+cont+')'}"  useHandCursor="true" buttonMode="true"
+			<s:Label text="{functions.dateFlexToStringTime(last)}"  useHandCursor="true" buttonMode="true"
 					 fontSize="8" fontWeight="bold" toolTip="{resourceManager.getString('resources', 'message.history')+lasts10}" click="labelHistory_clickHandler(event)"/>
 			<s:Image source="{status}" width="16" height="16" toolTip="{message}" useHandCursor="true" buttonMode="true"/>
 		</mx:HBox>

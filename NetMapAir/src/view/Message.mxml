@@ -2,12 +2,15 @@
 <s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx" 
-			   width="400" height="300" title="{titulo}"
+			   width="540" height="300" title="{titulo} - {endereco}"
 			   close="titlewindow_closeHandler(event)">
 	<fx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
+			
+			import scripts.functions;
 
 			
 			[Bindable]
@@ -15,18 +18,28 @@
 			[Bindable]
 			public var titulo:String = "";
 			[Bindable]
-			public var mensagem:String = "";
+			public var history:ArrayCollection = new ArrayCollection;
 			
 			
 			protected function titlewindow_closeHandler(event:CloseEvent):void
 			{
 				PopUpManager.removePopUp(this);
 			}
-			
+			public function formatDataGridToDateTime(item:Object, coluna:DataGridColumn):String
+			{
+				var data:Date = new Date(Date.parse(item[coluna.dataField]));
+				return functions.dateFlexToStringTime(data);
+			}
 		]]>
 	</fx:Script>
 	<mx:VBox width="100%" height="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10">
-		<s:Label text="{resourceManager.getString('resources', 'label.host')+': '+endereco}"/>
-		<s:TextArea width="100%" height="100%" editable="false" text="{mensagem}"/>
+		<mx:DataGrid id="dataGridHistory" width="100%" height="100%" dataProvider="{history}">
+			<mx:columns>
+				<mx:DataGridColumn headerText="Id" dataField="HISnId" width="50"/>
+				<mx:DataGridColumn headerText="{resourceManager.getString('resources', 'message.last.date')}" dataField="HISdDate" labelFunction="formatDataGridToDateTime"/>
+				<mx:DataGridColumn headerText="{resourceManager.getString('resources', 'message.last.status')}" dataField="HISsStatus" width="80"/>
+				<mx:DataGridColumn headerText="{resourceManager.getString('resources', 'message.last.time')}" dataField="HISnResponseTime" width="170"/>
+			</mx:columns>
+		</mx:DataGrid>
 	</mx:VBox>
 </s:TitleWindow>
