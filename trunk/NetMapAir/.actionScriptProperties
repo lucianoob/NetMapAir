@@ -12,7 +12,7 @@
         </excludedEntries>
       </libraryPathEntry>
       <libraryPathEntry kind="1" linkType="1" path="libs"/>
-      <libraryPathEntry kind="3" linkType="1" path="${DOCUMENTS}/IAutomate/bin/IAutomate.swc" useDefaultLinkType="false"/>
+      <libraryPathEntry kind="3" linkType="1" path="${DOCUMENTS}/IAutomateAir/bin/IAutomateAir.swc" useDefaultLinkType="false"/>
     </libraryPath>
     <sourceAttachmentPath/>
   </compiler>
@@ -28,12 +28,15 @@
     <buildTarget buildTargetName="default">
       <airSettings airCertificatePath="C:/workspaces/Flex/certIAutomate.p12" airTimestamp="false" anePathSet="true" version="1">
         <airExcludes>
+          <pathEntry path="Setup-NetMapAir_v1.6.0.zip"/>
           <pathEntry path="snap04.png"/>
           <pathEntry path="snap03.png"/>
           <pathEntry path="snap02.png"/>
+          <pathEntry path="Setup-NetMapAir_v1.4.59.zip"/>
           <pathEntry path="snap01.png"/>
-          <pathEntry path="index.html"/>
           <pathEntry path="updateDescriptor.xml"/>
+          <pathEntry path="index.html"/>
+          <pathEntry path="Setup-NetMapAir_v1.5.10.zip"/>
         </airExcludes>
         <anePaths/>
       </airSettings>

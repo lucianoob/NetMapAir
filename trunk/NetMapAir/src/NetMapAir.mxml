@@ -15,27 +15,22 @@
 			import air.net.URLMonitor;
 			import air.update.ApplicationUpdaterUI;
 			
-			import control.LineWithArrow;
+			import components.HelpMailWindow;
+			
 			import control.SimpleEncryptionKeyGenerator;
 			
-			import flash.events.StatusEvent;
 			import flash.net.Socket;
 			import flash.net.URLRequest;
-			
-			import model.vo.device_vo;
+			import flash.net.navigateToURL;
 			
 			import mx.collections.ArrayCollection;
 			import mx.collections.XMLListCollection;
 			import mx.controls.Alert;
-			import mx.events.CloseEvent;
-			import mx.events.DragEvent;
 			import mx.events.FlexEvent;
 			import mx.events.FlexNativeMenuEvent;
-			import mx.graphics.SolidColorStroke;
+			import mx.managers.CursorManager;
 			import mx.managers.PopUpManager;
 			import mx.utils.ObjectUtil;
-			
-			import spark.components.supportClasses.Range;
 			
 			import view.Config;
 			import view.Device;
@@ -63,6 +58,12 @@
 			[Bindable]
 			private var devices:ArrayCollection = new ArrayCollection;
 			
+			private var dockImage:BitmapData;
+			private var dockImages:Array =  ['assets/icon_016.png',
+											 'assets/icon_032.png',
+											 'assets/icon_048.png',
+											 'assets/icon_128.png'];
+			
 			protected function windowedapplication_applicationCompleteHandler(event:FlexEvent):void
 			{
 				tracker.trackPageview("/NetMapAir");
@@ -73,7 +74,7 @@
 				this.title = "NetMapAir "+versionLabel;
 				database = File.applicationStorageDirectory.resolvePath("NetMapAir.db");
 				connection = new SQLConnection();
-				connection.addEventListener(SQLEvent.OPEN, sql_openHandler);
+				connection.addEventListener(SQLEvent.OPEN, createDevices_sqlHandler);
 				var pass:SimpleEncryptionKeyGenerator = new SimpleEncryptionKeyGenerator();
 				connection.openAsync(database, SQLMode.CREATE, null, false, 1024, pass.getEncryptionKey("xTc5%f!1.'Q")); 
 				appUpdater.configurationFile = new File("app:/updateConfig.xml"); 
@@ -81,24 +82,82 @@
 				updateTimer = new Timer(20000, 1);
 				updateTimer.addEventListener(TimerEvent.TIMER_COMPLETE, updateTimer_completeHandler);
 				updateTimer.start();
+				var loader:Loader = new Loader();
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, prepareForSystray);
+				loader.load(new URLRequest(dockImages[0]));
 			}
 			protected function updateTimer_completeHandler(event:TimerEvent):void
 			{
 				appUpdater.isCheckForUpdateVisible = false;
 				appUpdater.checkNow();
 			}
-			protected function sql_openHandler(event:SQLEvent):void
+			public function prepareForSystray(event:Event):void 
+			{
+				dockImage = event.target.content.bitmapData;
+				NativeApplication.nativeApplication.icon.bitmaps = [dockImage];
+				if (NativeApplication.supportsSystemTrayIcon){
+					SystemTrayIcon(NativeApplication.nativeApplication.icon).tooltip = this.title;
+					SystemTrayIcon(NativeApplication.nativeApplication.icon).menu = createSystrayRootMenu();
+				}
+				if (NativeApplication.supportsDockIcon){
+					var dockIcon:DockIcon = NativeApplication.nativeApplication.icon as DockIcon;
+					dockIcon.menu = createSystrayRootMenu();
+				}
+			}
+			private function createSystrayRootMenu():NativeMenu
+			{
+				var menu:NativeMenu = new NativeMenu();
+				var IAutomateNativeMenuItem:NativeMenuItem = new NativeMenuItem("IAutomate");
+				var openNativeMenuItem:NativeMenuItem = new NativeMenuItem("Show");
+				var atualizarNativeMenuItem:NativeMenuItem = new NativeMenuItem("Atualizar");
+				var exitNativeMenuItem:NativeMenuItem = new NativeMenuItem("Sair");
+				
+				IAutomateNativeMenuItem.addEventListener(Event.SELECT, IAutomateNativeMenuItem_MenuHandler);
+				openNativeMenuItem.addEventListener(Event.SELECT, openNativeMenuItem_MenuHandler);
+				exitNativeMenuItem.addEventListener(Event.SELECT, exitNativeMenuItem_MenuHandler);
+				
+				menu.addItem(IAutomateNativeMenuItem);
+				menu.addItem(new NativeMenuItem("",true));
+				menu.addItem(openNativeMenuItem);
+				menu.addItem(new NativeMenuItem("",true));
+				menu.addItem(exitNativeMenuItem);
+				
+				return menu;
+			}
+			protected function IAutomateNativeMenuItem_MenuHandler(evt:Event):void 
+			{
+				navigateToURL(new URLRequest("http://www.iautomate.com.br"), "_blank");
+			}
+			protected function openNativeMenuItem_MenuHandler(evt:Event):void 
+			{
+				stage.nativeWindow.maximize();
+				stage.nativeWindow.orderToFront();
+			}
+			protected function exitNativeMenuItem_MenuHandler(evt:Event):void 
+			{
+				stage.nativeWindow.close();
+			}
+			protected function createDevices_sqlHandler(event:SQLEvent):void
 			{
 				stat = new SQLStatement();
 				stat.sqlConnection = connection;
-				stat.text = "CREATE TABLE IF NOT EXISTS Devices (DEVnId INTEGER PRIMARY KEY AUTOINCREMENT, DEVsHost TEXT, DEVsPort TEXT, DEVsPosX TEXT, DEVsPosY TEXT);";
-				stat.execute(-1, new Responder(sql_openSucessHandler, sql_errorHandler));
+				stat.text = "CREATE TABLE IF NOT EXISTS Devices (DEVnId INTEGER PRIMARY KEY AUTOINCREMENT, DEVsHost TEXT, DEVsPort TEXT, "; 
+				stat.text += "DEVsPosX TEXT, DEVsPosY TEXT);";
+				stat.execute(-1, new Responder(createConfig_sqlHandler, sql_errorHandler));
 			}
-			protected function sql_openSucessHandler(event:SQLResult):void
+			protected function createConfig_sqlHandler(event:SQLResult):void
 			{
 				stat = new SQLStatement();
 				stat.sqlConnection = connection;
 				stat.text = "CREATE TABLE IF NOT EXISTS Config (CFGnId INTEGER PRIMARY KEY AUTOINCREMENT, CFGnTime INTEGER);";
+				stat.execute(-1, new Responder(createHistory_sqlHandler, sql_errorHandler));
+			}
+			protected function createHistory_sqlHandler(event:SQLResult):void
+			{
+				stat = new SQLStatement();
+				stat.sqlConnection = connection;
+				stat.text = "CREATE TABLE IF NOT EXISTS History (HISnId INTEGER PRIMARY KEY AUTOINCREMENT, HISnDevice NUMERIC NOT NULL DEFAULT 0, ";
+				stat.text += "HISdDate DATE, HISsStatus STRING, HISnResponseTime INTEGER NOT NULL DEFAULT 0);";
 				stat.execute(-1, new Responder(sql_configHandler, sql_errorHandler));
 			}
 			protected function sql_configHandler(event:SQLResult):void
@@ -159,6 +218,30 @@
 				{
 					appUpdater.isCheckForUpdateVisible = true;
 					appUpdater.checkNow();
+				} else if(event.item.@data == "contact")
+				{
+					var messages:Array = new Array();
+					messages['app.title'] = resourceManager.getString('resources', 'help.app.title');
+					messages['error.title'] = resourceManager.getString('resources', 'help.error.title');
+					messages['success.message'] = resourceManager.getString('resources', 'help.success.message');
+					messages['success.title'] = resourceManager.getString('resources', 'help.success.title');
+					messages['error.validate'] = resourceManager.getString('resources', 'help.error.validate');
+					messages['email.send'] = resourceManager.getString('resources', 'help.email.send');
+					messages['email.connect'] = resourceManager.getString('resources', 'help.email.connect');
+					messages['attach.title'] = resourceManager.getString('resources', 'help.attach.title');
+					messages['attach.message'] = resourceManager.getString('resources', 'help.attach.message');;
+					messages['label.name'] = resourceManager.getString('resources', 'help.label.name');
+					messages['label.email'] = resourceManager.getString('resources', 'help.label.email');
+					messages['label.title'] = resourceManager.getString('resources', 'help.label.title');
+					messages['label.message'] = resourceManager.getString('resources', 'help.label.message');
+					messages['label.attach'] = resourceManager.getString('resources', 'help.label.attach');
+					messages['label.send'] = resourceManager.getString('resources', 'help.label.send');
+					var contato:HelpMailWindow = new HelpMailWindow();
+					contato.system = this.title;
+					contato.window = this.parent;
+					contato.messages = messages;
+					PopUpManager.addPopUp(contato, this, false);
+					PopUpManager.centerPopUp(contato);
 				} else if(event.item.@data == "about")
 				{
 					about = new Sobre();
@@ -245,11 +328,13 @@
 			</menuitem>
 			<menuitem label="{resourceManager.getString('resources', 'menu.help')}">
 				<menuitem label="{resourceManager.getString('resources', 'menu.help.content')}" data="content_help"/>
+				<menuitem label="{resourceManager.getString('resources', 'menu.help.contact')}" data="contact"/>
 				<menuitem label="{resourceManager.getString('resources', 'menu.help.update')}" data="update"  keyEquivalent="u" controlKey="true"/>
 				<menuitem type="separator" />
 				<menuitem label="{resourceManager.getString('resources', 'menu.help.about')}" data="about" keyEquivalent="a" controlKey="true"/>
 			</menuitem>
 		</fx:XMLList>
+		
 		<analytics:FlexTracker
 			xmlns:analytics="com.google.analytics.components.*"
 			id="tracker"

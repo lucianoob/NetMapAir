@@ -40,7 +40,7 @@ s|TextInput
 	fontSize: 14;
 	fontWeight: bold;
 }
-s|TextArea
+mx|DataGrid
 {
 	font-family: Verdana;
 	fontSize: 14;
